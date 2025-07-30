@@ -39,13 +39,13 @@ amp_matrix = {
     "Z": [0.14, 0.14, 0.14, 0.28, 0.28, 0.3]
 }
 
-# Use experiment data and expand one quanta
+# Use experiment data and expand two quanta
 duration_matrix = {
     "OP": [8e-5],
     "CO": [1e-4],
-    "X": [5e-5, 7e-5, 7e-5, 9e-5],
-    "Y": [5e-5, 7e-5, 7e-5, 9e-5],
-    "Z": [2e-4, 2e-4, 2e-4, 5e-5, 5e-5, 7e-5]
+    "X": [5e-5, 7e-5, 7e-5, 9e-5, 9e-5],
+    "Y": [5e-5, 7e-5, 7e-5, 9e-5, 9e-5],
+    "Z": [2e-4, 2e-4, 2e-4, 5e-5, 5e-5, 7e-5, 7e-5]
 }
 
 
@@ -397,6 +397,14 @@ def apply_raman_sequence(mol_list, pulse_sequence, optical_pumping=True, print_r
     sems = []
     n_bars = []
 
+    # Append for initial molecules
+    ground_count = np.sum([mol.n == [0, 0, 0] for mol in mol_list if mol.state==1 and mol.spin==0])
+    ground_state_counts.append(ground_count)
+    n, n_bar, sem = cost_function(mol_list)
+    sems.append(sem)
+    num_survive.append(n)
+    n_bars.append(n_bar)
+
     for pulse_index, (axis, delta_n, t) in tqdm(enumerate(pulse_sequence), total=len(pulse_sequence), desc="Applying pulses"):
         for i, mol in enumerate(mol_list):
             mol.Raman_transition(axis=axis, delta_n=delta_n, time=t, print_report=print_report)
@@ -413,8 +421,6 @@ def apply_raman_sequence(mol_list, pulse_sequence, optical_pumping=True, print_r
 
     return n_bars, num_survive, ground_state_counts, sems
 
-
-from scipy.optimize import curve_fit
 
 def readout_molecule_properties(mol_list, trap_freq=trap_freq, n_max_fit=max(n_basis)):
     """
@@ -599,11 +605,12 @@ def plot_n_distribution(mol_list):
     n_x, n_y, n_z = [], [], []
     for mol in mol_list:
         if mol.spin == 0:
-            n_vals = mol.n
-            n_x.append(n_vals[0])
-            n_y.append(n_vals[1])
-            n_z.append(n_vals[2])
-            mol_num += 1
+            if mol.state == 1:
+                n_vals = mol.n
+                n_x.append(n_vals[0])
+                n_y.append(n_vals[1])
+                n_z.append(n_vals[2])
+                mol_num += 1
 
     # Count frequencies
     counts_x = Counter(n_x)
