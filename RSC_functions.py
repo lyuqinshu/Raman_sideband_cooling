@@ -27,25 +27,24 @@ n_basis = np.arange(0, 40)
 
 M_FACTOR_TABLE = np.load("M_FACTOR_TABLE.npy")
 
-# Decide how good is each vibrational state, in the order of n=0, 1, 2 ...
-scores = [1/3, 1/10, 1/20, 1/40, 1/50]
 
 # Experiment parameter for RSC
+# Use experiment data and expand 3 quanta for radial, 4 for axial
 
 amp_matrix = {
     "0": [0.92],
-    "X": [0.3, 0.65, 0.65, 0.7],
-    "Y": [0.3, 0.65, 0.65, 0.7],
-    "Z": [0.14, 0.14, 0.14, 0.28, 0.28, 0.3]
+    "X": [0.3, 0.65, 0.65, 1.0, 0.7, 0.85],
+    "Y": [0.3, 0.65, 0.65, 1.0, 0.7, 0.85],
+    "Z": [0.14, 0.14, 0.14, 0.28, 0.28, 0.35, 0.35, 0.4, 0.4]
 }
 
-# Use experiment data and expand two quanta
+
 duration_matrix = {
     "OP": [8e-5],
     "CO": [1e-4],
-    "X": [5e-5, 7e-5, 7e-5, 9e-5, 9e-5],
-    "Y": [5e-5, 7e-5, 7e-5, 9e-5, 9e-5],
-    "Z": [2e-4, 2e-4, 2e-4, 5e-5, 5e-5, 7e-5, 7e-5]
+    "X": [5e-5, 7e-5, 7e-5, 9e-5, 9e-5, 11e-5],
+    "Y": [5e-5, 7e-5, 7e-5, 9e-5, 9e-5, 11e-5],
+    "Z": [2e-4, 2e-4, 2e-4, 5e-5, 5e-5, 7e-5, 7e-5, 9e-5, 9e-5]
 }
 
 
@@ -641,3 +640,41 @@ def plot_n_distribution(mol_list):
     plt.show()
 
     return counts_x, counts_y, counts_z
+
+def plot_time_sequence_data(n_bar, num_survive, ground_state_count, sem):
+
+    fig, axs = plt.subplots(1, 4, figsize=(20, 4))
+
+    # Plot 1: Ground state count
+    axs[0].plot(range(len(ground_state_count)), ground_state_count, marker='o')
+    axs[0].set_title("3D Ground State Count")
+    axs[0].set_xlabel("Pulse #")
+    axs[0].set_ylabel("# in [0,0,0]")
+    axs[0].grid(True)
+
+    # Plot 2: Standard error
+    for i in [0, 1, 2]:
+        axs[1].plot(range(len(sem)), np.array(sem)[:, i], marker='o', label=f'axis {i}')
+    axs[1].set_title("Standard error")
+    axs[1].set_xlabel("Pulse #")
+    axs[1].set_ylabel("Standard error")
+    axs[1].grid(True)
+
+    # Plot 3: Molecules Survived
+    axs[2].plot(range(len(num_survive)), num_survive, marker='o')
+    axs[2].set_title("Surviving Molecules")
+    axs[2].set_xlabel("Pulse #")
+    axs[2].set_ylabel("Survivors")
+    axs[2].grid(True)
+
+    # Plot 4: Average n per axis
+    for i in [0, 1, 2]:
+        axs[3].plot(range(len(n_bar)), np.array(n_bar)[:, i], marker='o', label=f'axis {i}')
+    axs[3].set_title("Avg. Motional n")
+    axs[3].set_xlabel("Pulse #")
+    axs[3].set_ylabel("⟨n⟩")
+    axs[3].legend()
+    axs[3].grid(True)
+
+    plt.tight_layout()
+    plt.show()

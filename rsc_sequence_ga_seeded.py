@@ -5,12 +5,12 @@ import random
 from RSC_functions import initialize_thermal, apply_raman_sequence, pulse_time
 
 # Define allowed pulse types
-allowed_pulses = [(0, -4), (0, -3), (0, -2), (0, -1),
-                  (1, -4), (1, -3), (1, -2), (1, -1),
-                  (2, -6), (2, -5), (2, -4), (2, -3), (2, -2), (2, -1)]
-mol_num = 100
+allowed_pulses = [(0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (0, -1),
+                  (1, -6), (1, -5), (1, -4), (1, -3), (1, -2), (1, -1),
+                  (2, -9), (2, -8), (2, -7), (2, -6), (2, -5), (2, -4), (2, -3), (2, -2), (2, -1)]
+mol_num = 1000
 ngen = 50
-n_pop = 50
+n_pop = 20
 
 # Build original sequence
 
@@ -23,7 +23,7 @@ def load_best_sequence(filepath="best_sequence_same_length.txt"):
 
 
 
-sequence = load_best_sequence('sequences/original.txt')
+sequence = load_best_sequence('sequences/best_sequence_same_length.txt')
 
 N_PULSES = len(sequence)
 initial_indices = [allowed_pulses.index(p) for p in sequence]
@@ -36,11 +36,11 @@ def evaluate_sequence(individual):
     ]
     mols = initialize_thermal([25e-6, 25e-6, 25e-6], mol_num)
     n_bars, num_survive, ground_state_counts, sems = apply_raman_sequence(mols, sequence)
-    return (np.mean(sems[-1]),)
+    return (np.mean(ground_state_counts[-1]),)
 
 # DEAP setup
-creator.create("FitnessMin", base.Fitness, weights=(1.0,))
-creator.create("Individual", list, fitness=creator.FitnessMin)
+creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+creator.create("Individual", list, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
 toolbox.register("gene", lambda: random.randint(0, len(allowed_pulses) - 1))
@@ -61,7 +61,7 @@ def run_ga():
     hof = tools.HallOfFame(1)
     stats = tools.Statistics(lambda ind: ind.fitness.values)
     stats.register("avg", np.mean)
-    stats.register("min", np.min)
+    stats.register("max", np.max)
 
     algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.3, ngen=ngen,
                         stats=stats, halloffame=hof, verbose=True)
