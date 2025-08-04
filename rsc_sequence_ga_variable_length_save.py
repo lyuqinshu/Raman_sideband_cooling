@@ -5,81 +5,41 @@ import random
 from RSC_functions import initialize_thermal, apply_raman_sequence, pulse_time
 
 # Define allowed pulse types
-allowed_pulses = [(0, -3), (0, -2), (0, -1),
-                  (1, -3), (1, -2), (1, -1),
-                  (2, -5), (2, -4), (2, -3), (2, -2), (2, -1)]
+allowed_pulses = [(0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (0, -1),
+                  (1, -6), (1, -5), (1, -4), (1, -3), (1, -2), (1, -1),
+                  (2, -9), (2, -8), (2, -7), (2, -6), (2, -5), (2, -4), (2, -3), (2, -2), (2, -1)]
 
 # Build original sequence
 
 # Build the original sequence manually
 import RSC_functions
 
-sequence = []
-# 10 * XY
-for _ in range(10):
-    sequence.append((0, -3))
-    sequence.append((1, -3))
-    sequence.append((0, -2))
-    sequence.append((1, -2))
+def load_best_sequence(filepath):
+    with open(filepath, "r") as f:
+        lines = f.readlines()
+    sequence = [(eval(line.strip())[0], eval(line.strip())[1]) for line in lines]  # Extract [axis, delta_n]
+    return sequence
 
-# 5 * XYZ1
-for _ in range(5):
-    sequence.append((2, -5))
-    sequence.append((0, -2))
-    sequence.append((2, -4))
-    sequence.append((1, -2))
-    sequence.append((2, -5))
-    sequence.append((0, -1))
-    sequence.append((2, -4))
-    sequence.append((1, -1))
 
-# 5 * XYZ2
-for _ in range(5):
-    sequence.append((2, -4))
-    sequence.append((0, -2))
-    sequence.append((2, -3))
-    sequence.append((1, -2))
-    sequence.append((2, -4))
-    sequence.append((0, -1))
-    sequence.append((2, -3))
-    sequence.append((1, -1))
 
-# 10 * XYZ3
-for _ in range(10):
-    sequence.append((2, -3))
-    sequence.append((0, -2))
-    sequence.append((2, -2))
-    sequence.append((1, -2))
-    sequence.append((2, -3))
-    sequence.append((0, -1))
-    sequence.append((2, -2))
-    sequence.append((1, -1))
-
-# 10 * XYZ4
-for _ in range(10):
-    sequence.append((2, -2))
-    sequence.append((0, -2))
-    sequence.append((2, -1))
-    sequence.append((1, -2))
-    sequence.append((2, -2))
-    sequence.append((0, -1))
-    sequence.append((2, -1))
-    sequence.append((1, -1))
+sequence = load_best_sequence('sequences/best_sequence_1.txt')
 
 initial_indices = [allowed_pulses.index(p) for p in sequence]
 
 # Allow genome lengths to vary
 MIN_PULSES = 50
-MAX_PULSES = 300
-
+MAX_PULSES = 400
+mol_num = 1000
+ngen = 50
+n_pop = 20
 def evaluate_sequence(individual):
     pulses = [allowed_pulses[i] for i in individual]
     sequence = [
         [axis, delta_n, pulse_time(axis, delta_n)]
         for (axis, delta_n) in pulses
     ]
-    mols = initialize_thermal([25e-6, 25e-6, 25e-6], 100)
-    _, _, ground_counts = apply_raman_sequence(mols, sequence)
+    mols = initialize_thermal([25e-6, 25e-6, 25e-6], mol_num)
+    _, _, ground_counts, _ = apply_raman_sequence(mols, sequence)
     return (ground_counts[-1],)
 
 # DEAP setup
@@ -100,7 +60,7 @@ toolbox.register("select", tools.selTournament, tournsize=3)
 
 # Run GA
 def run_ga():
-    pop = toolbox.population(n=20)
+    pop = toolbox.population(n=n_pop)
     seed_individual = creator.Individual(initial_indices[:])
     pop[0] = seed_individual  # Use known-good as seed
 
@@ -109,7 +69,7 @@ def run_ga():
     stats.register("avg", np.mean)
     stats.register("max", np.max)
 
-    algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.3, ngen=30,
+    algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.3, ngen=ngen,
                         stats=stats, halloffame=hof, verbose=True)
 
     best_ind = hof[0]
@@ -120,7 +80,10 @@ def run_ga():
     
     # Save best sequence as [[axis, delta_n], ...]
     best_logical = [[axis, delta_n] for (axis, delta_n) in [allowed_pulses[i] for i in best_ind]]
-    with open("best_sequence_logical.txt", "w") as f:
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"sequences/sequence_var_length_{timestamp}.txt"
+    with open(filename, "w") as f:
         for item in best_logical:
             f.write(str(item) + "\n")
     return best_sequence

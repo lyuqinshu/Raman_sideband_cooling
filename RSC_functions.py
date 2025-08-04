@@ -33,8 +33,8 @@ M_FACTOR_TABLE = np.load("M_FACTOR_TABLE.npy")
 
 amp_matrix = {
     "0": [0.92],
-    "X": [0.3, 0.65, 0.65, 1.0, 0.7, 0.85],
-    "Y": [0.3, 0.65, 0.65, 1.0, 0.7, 0.85],
+    "X": [0.3, 0.65, 0.65, 0.7, 0.7, 0.85],
+    "Y": [0.3, 0.65, 0.65, 0.7, 0.7, 0.85],
     "Z": [0.14, 0.14, 0.14, 0.28, 0.28, 0.35, 0.35, 0.4, 0.4]
 }
 
@@ -678,3 +678,13 @@ def plot_time_sequence_data(n_bar, num_survive, ground_state_count, sem):
 
     plt.tight_layout()
     plt.show()
+
+def load_sequence(filepath="best_sequence_same_length.txt"):
+    '''
+    Load sequence from .txt file, in the form of [[axis, delta_n], ...]
+    Retuens a sequence that can be used in apply_raman_sequence
+    '''
+    with open(filepath, "r") as f:
+        lines = f.readlines()
+    sequence = [eval(line.strip()) for line in lines]  # [[axis, delta_n], ...]
+    return sequence
