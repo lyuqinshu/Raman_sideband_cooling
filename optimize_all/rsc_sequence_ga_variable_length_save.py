@@ -2,7 +2,7 @@
 from deap import base, creator, tools, algorithms
 import numpy as np
 import random
-from RSC_functions import initialize_thermal, apply_raman_sequence, pulse_time
+import RSC_sim
 
 # Define allowed pulse types
 allowed_pulses = [(0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (0, -1),
@@ -13,16 +13,12 @@ allowed_pulses = [(0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (0, -1),
 
 # Build the original sequence manually
 import RSC_functions
-
-def load_best_sequence(filepath):
-    with open(filepath, "r") as f:
-        lines = f.readlines()
-    sequence = [(eval(line.strip())[0], eval(line.strip())[1]) for line in lines]  # Extract [axis, delta_n]
-    return sequence
+import sequence_functions
 
 
 
-sequence = load_best_sequence('sequences/best_sequence_1.txt')
+
+sequence = sequence_functions.load_sequence('sequences/best_sequence_1.txt')
 
 initial_indices = [allowed_pulses.index(p) for p in sequence]
 
@@ -35,11 +31,11 @@ n_pop = 20
 def evaluate_sequence(individual):
     pulses = [allowed_pulses[i] for i in individual]
     sequence = [
-        [axis, delta_n, pulse_time(axis, delta_n)]
+        [axis, delta_n, RSC_sim.pulse_time(axis, delta_n)]
         for (axis, delta_n) in pulses
     ]
-    mols = initialize_thermal([25e-6, 25e-6, 25e-6], mol_num)
-    _, _, ground_counts, _ = apply_raman_sequence(mols, sequence)
+    mols = RSC_sim.initialize_thermal([25e-6, 25e-6, 25e-6], mol_num)
+    _, _, ground_counts, _ = RSC_sim.apply_raman_sequence(mols, sequence)
     return (ground_counts[-1],)
 
 # DEAP setup
@@ -74,7 +70,7 @@ def run_ga():
 
     best_ind = hof[0]
     best_sequence = [
-        [axis, delta_n, pulse_time(axis, delta_n)]
+        [axis, delta_n, RSC_sim.pulse_time(axis, delta_n)]
         for (axis, delta_n) in [allowed_pulses[i] for i in best_ind]
     ]
     

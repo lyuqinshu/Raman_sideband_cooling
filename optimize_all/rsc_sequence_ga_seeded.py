@@ -2,7 +2,7 @@
 from deap import base, creator, tools, algorithms
 import numpy as np
 import random
-from RSC_functions import initialize_thermal, apply_raman_sequence, pulse_time
+import RSC_sim
 
 # Define allowed pulse types
 allowed_pulses = [(0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (0, -1),
@@ -31,11 +31,11 @@ initial_indices = [allowed_pulses.index(p) for p in sequence]
 def evaluate_sequence(individual):
     pulses = [allowed_pulses[i] for i in individual]
     sequence = [
-        [axis, delta_n, pulse_time(axis, delta_n)]
+        [axis, delta_n, RSC_sim.pulse_time(axis, delta_n)]
         for (axis, delta_n) in pulses
     ]
-    mols = initialize_thermal([25e-6, 25e-6, 25e-6], mol_num)
-    n_bars, num_survive, ground_state_counts, sems = apply_raman_sequence(mols, sequence)
+    mols = RSC_sim.initialize_thermal([25e-6, 25e-6, 25e-6], mol_num)
+    n_bars, num_survive, ground_state_counts, sems = RSC_sim.apply_raman_sequence(mols, sequence)
     return (np.mean(ground_state_counts[-1]),)
 
 # DEAP setup
@@ -68,7 +68,7 @@ def run_ga():
 
     best_ind = hof[0]
     best_sequence = [
-        [axis, delta_n, pulse_time(axis, delta_n)]
+        [axis, delta_n, RSC_sim.pulse_time(axis, delta_n)]
         for (axis, delta_n) in [allowed_pulses[i] for i in best_ind]
     ]
     # Save best sequence as [[axis, delta_n], ...]
