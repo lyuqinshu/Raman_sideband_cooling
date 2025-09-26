@@ -12,21 +12,22 @@ import os
 import RSC_sim
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor, as_completed
-import scipy.stats as stats
+import scipy.stats
 
 # -----------------------------
 # Problem definition / fitness
 # -----------------------------
 
-ALLOWED_PULSES: List[Tuple[int, int]] = [
-    (0, -6), (0, -5), (0, -4), (0, -3), (0, -2),
-    (1, -6), (1, -5), (1, -4), (1, -3), (1, -2),
-]
+# ALLOWED_PULSES: List[Tuple[int, int]] = [
+#     (0, -6), (0, -5), (0, -4), (0, -3), (0, -2),
+#     (1, -6), (1, -5), (1, -4), (1, -3), (1, -2),
+# ]
 
 @dataclass
 class GAConfig:
     mol_num: int = 1000
     temps: Tuple[float, float, float] = (25e-6, 25e-6, 25e-6)
+    allowed_pulses: Tuple[Tuple[int, int]] = ((0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (1, -6), (1, -5), (1, -4), (1, -3), (1, -2))
     ngen: int = 10
     mu: int = 40         
     lambda_: int = 20    
@@ -54,12 +55,12 @@ class GAConfig:
 def cost_function(mol_list: Iterable) -> int:
     good = 0
     for mol in mol_list:
-        if mol.n[0] <= 1 and mol.n[1] <= 1 and mol.state == 1 and mol.spin == 0 and not getattr(mol, "islost", False):
+        if mol.n[0] <= 1 and mol.n[1] <= 1 and mol.state == 1 and mol.spin == 0 and not mol.islost:
             good += 1
     return good
 
-def sequence_from_indices(indices: List[int]) -> List[Tuple[int, int, float]]:
-    pulses = [ALLOWED_PULSES[i] for i in indices]
+def sequence_from_indices(indices: List[int], cfg: GAConfig) -> List[Tuple[int, int, float]]:
+    pulses = [cfg.allowed_pulses[i] for i in indices]
     return [[axis, dn, RSC_sim.pulse_time(axis, dn)] for axis, dn in pulses]
 
 
@@ -90,7 +91,7 @@ def build_toolbox(N_PULSES: int, cfg: GAConfig, seed_indices: Optional[List[int]
 
     def init_individual() -> creator.Individual:
         L = random.randint(cfg.min_len, cfg.max_len)
-        return creator.Individual([random.randint(0, len(ALLOWED_PULSES) - 1) for _ in range(L)])
+        return creator.Individual([random.randint(0, len(cfg.allowed_pulses) - 1) for _ in range(L)])
 
     toolbox.register("individual", init_individual)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
@@ -107,7 +108,7 @@ def build_toolbox(N_PULSES: int, cfg: GAConfig, seed_indices: Optional[List[int]
     if seed_indices is not None:
         seed = creator.Individual(seed_indices[:])
         if len(seed) < cfg.min_len:
-            seed.extend([random.randint(0, len(ALLOWED_PULSES)-1) for _ in range(cfg.min_len - len(seed))])
+            seed.extend([random.randint(0, len(cfg.allowed_pulses)-1) for _ in range(cfg.min_len - len(seed))])
         if len(seed) > cfg.max_len:
             del seed[cfg.max_len:]
         toolbox.seed_individual = seed
@@ -133,10 +134,10 @@ def _mut_varlen_factory(cfg: GAConfig):
     def mut_varlen(ind):
         if random.random() < cfg.p_modify and len(ind) > 0:
             i = random.randrange(len(ind))
-            ind[i] = random.randint(0, len(ALLOWED_PULSES)-1)
+            ind[i] = random.randint(0, len(cfg.allowed_pulses)-1)
         if random.random() < cfg.p_insert and len(ind) < cfg.max_len:
             i = random.randrange(len(ind)+1)
-            ind.insert(i, random.randint(0, len(ALLOWED_PULSES)-1))
+            ind.insert(i, random.randint(0, len(cfg.allowed_pulses)-1))
         if random.random() < cfg.p_delete and len(ind) > cfg.min_len:
             i = random.randrange(len(ind))
             del ind[i]
@@ -164,7 +165,7 @@ def _evaluate_individuals_via_jobs(individuals: List[List[int]],
         max_workers = os.cpu_count() or 4
 
     # Pre-compute pulse sequences for all individuals
-    seqs = [sequence_from_indices(ind) for ind in individuals]
+    seqs = [sequence_from_indices(ind, cfg) for ind in individuals]
 
     # Prepare per-individual molecule storage
     from collections import defaultdict
@@ -218,7 +219,7 @@ def run_ga_strong(N_PULSES: int,
             seed = list(seed_indices[:])
 
     if len(seed) < cfg.min_len:
-        seed.extend([random.randint(0, len(ALLOWED_PULSES)-1) for _ in range(cfg.min_len - len(seed))])
+        seed.extend([random.randint(0, len(cfg.allowed_pulses)-1) for _ in range(cfg.min_len - len(seed))])
     if len(seed) > cfg.max_len:
         del seed[cfg.max_len:]
     if len(pop) > 0:
@@ -227,7 +228,7 @@ def run_ga_strong(N_PULSES: int,
     hof = tools.HallOfFame(1)
     stats = tools.Statistics(lambda ind: ind.fitness.values[0])
     stats.register("max", np.max)
-    stats.register("std", stats.sem)
+    stats.register("std", scipy.stats.sem)
     stats.register("all", np.asarray)
 
     logbook = tools.Logbook()
@@ -323,8 +324,8 @@ def load_seed_sequence(filepath: str) -> List[Tuple[int, int]]:
     seq = [(eval(line)[0], eval(line)[1]) for line in lines]
     return seq
 
-def save_sequence_with_times(indices: List[int], out_path: str) -> None:
-    seq = sequence_from_indices(indices)
+def save_sequence_with_times(indices: List[int], cfg: GAConfig, out_path: str) -> None:
+    seq = sequence_from_indices(indices, cfg)
     with open(out_path, "w") as f:
         for item in seq:
             f.write(str(item) + "\n")
@@ -333,6 +334,35 @@ def save_config(cfg: GAConfig, out_path: str) -> None:
     with open(out_path, "w") as f:
         json.dump(asdict(cfg), f, indent=2)
 
+def run_ga_master(cfg: GAConfig,
+                  random_seed: Optional[int] = None,):
+    if random_seed is not None:
+        random.seed(random_seed)
+        np.random.seed(random_seed)
+    
+    seed_pairs = load_seed_sequence('sequence_XY.txt')
+    N_PULSES = len(seed_pairs)
+    seed_indices = [cfg.allowed_pulses.index(p) for p in seed_pairs]
+
+    best_idx, best_history, history = run_ga_strong(N_PULSES, seed_indices, cfg, EVAL_MAX_WORKERS=None)
+
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    file_dir = "sequences/" + ts
+    os.mkdir(file_dir)
+    save_sequence_with_times(best_idx, cfg, file_dir + "/best_sequence.txt")
+    save_config(cfg, file_dir + "/config.json")
+    with open(file_dir + "/history.txt", "w") as f:
+        for val in history:
+            f.write(f"{val}\n")
+
+    with open(file_dir + "/allowed_pulses.txt", "w") as f:
+        for p in cfg.allowed_pulses:
+            f.write(f"{p}\n")
+
+    print("Best length: ", len(best_idx))
+    print("Best history: ", best_history)
+    print("Done.")
+
 # --------------
 # Demo / script
 # --------------
@@ -340,15 +370,14 @@ if __name__ == "__main__":
     random.seed(42)
     np.random.seed(42)
 
-    seed_pairs = load_seed_sequence('sequence_XY.txt')
-    N_PULSES = len(seed_pairs)
-    seed_indices = [ALLOWED_PULSES.index(p) for p in seed_pairs]
+    
 
     cfg = GAConfig(
         mol_num=1000,
         temps=(25e-6, 25e-6, 25e-6),
-        ngen=1,
-        mu=5, # population size
+        allowed_pulses=((0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (1, -6), (1, -5), (1, -4), (1, -3), (1, -2)),
+        ngen=3,
+        mu=10, # population size
         lambda_=5, # number of selected parents after tournament
         cxpb=0.65,
         mutpb=0.35,
@@ -365,19 +394,23 @@ if __name__ == "__main__":
         p_modify=0.60,
     )
 
+    seed_pairs = load_seed_sequence('sequence_XY.txt')
+    N_PULSES = len(seed_pairs)
+    seed_indices = [cfg.allowed_pulses.index(p) for p in seed_pairs]
+
     best_idx, best_history, history = run_ga_strong(N_PULSES, seed_indices, cfg, EVAL_MAX_WORKERS=None)
 
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     file_dir = "sequences/" + ts
     os.mkdir(file_dir)
-    save_sequence_with_times(best_idx, file_dir + "/best_sequence.txt")
+    save_sequence_with_times(best_idx, cfg, file_dir + "/best_sequence.txt")
     save_config(cfg, file_dir + "/config.json")
     with open(file_dir + "/history.txt", "w") as f:
         for val in history:
             f.write(f"{val}\n")
 
     with open(file_dir + "/allowed_pulses.txt", "w") as f:
-        for p in ALLOWED_PULSES:
+        for p in cfg.allowed_pulses:
             f.write(f"{p}\n")
 
     print("Best length: ", len(best_idx))
