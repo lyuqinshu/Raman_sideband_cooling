@@ -400,7 +400,7 @@ if __name__ == "__main__":
             allowed_pulses=((0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (1, -6), (1, -5), (1, -4), (1, -3), (1, -2)),
             ngen=5,
             mu=int(pop_size), # population size
-            lambda_=int(pop_size)/2, # number of selected parents after tournament
+            lambda_=int(pop_size/2), # number of selected parents after tournament
             cxpb=0.65,
             mutpb=0.35,
             tournament_k=3, # tournament size
