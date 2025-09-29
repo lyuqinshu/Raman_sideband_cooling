@@ -55,7 +55,7 @@ class GAConfig:
 def cost_function(mol_list: Iterable) -> int:
     good = 0
     for mol in mol_list:
-        if mol.n[0] <= 1 and mol.n[1] <= 1 and mol.state == 1 and mol.spin == 0 and not mol.islost:
+        if mol.n[0] <= 1 and mol.n[1] <= 1 and mol.n[2] <= 120 and mol.state == 1 and mol.spin == 0 and not mol.islost:
             good += 1
     return good
 
@@ -376,9 +376,9 @@ if __name__ == "__main__":
         mol_num=1000,
         temps=(25e-6, 25e-6, 25e-6),
         allowed_pulses=((0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (1, -6), (1, -5), (1, -4), (1, -3), (1, -2)),
-        ngen=3,
-        mu=10, # population size
-        lambda_=5, # number of selected parents after tournament
+        ngen=20,
+        mu=150, # population size
+        lambda_=75, # number of selected parents after tournament
         cxpb=0.65,
         mutpb=0.35,
         tournament_k=3, # tournament size
