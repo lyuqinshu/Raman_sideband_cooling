@@ -418,6 +418,6 @@ if __name__ == "__main__":
 
         
 
-        best_idx, best_history, history = run_ga_strong(cfg, EVAL_MAX_WORKERS=None)
+        best_idx, best_history, history = run_ga_master(cfg, EVAL_MAX_WORKERS=None)
 
     
