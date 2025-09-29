@@ -47,6 +47,7 @@ class GAConfig:
     p_insert: float = 0.20
     p_delete: float = 0.20
     p_modify: float = 0.60
+    random_seed: int = 42
 
 # -----------------------------
 # Helpers
@@ -313,7 +314,7 @@ def run_ga_strong(cfg: GAConfig,
             if gens_without_improve >= cfg.patience:
                 break
 
-    best_ind = list(hof[0])
+    best_idx = list(hof[0])
 
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     file_dir = "sequences/" + ts
@@ -332,7 +333,7 @@ def run_ga_strong(cfg: GAConfig,
     print("Best history: ", best_history)
     print("Done.")
 
-    return best_ind, best_history, history
+    return best_idx, best_history, history
 
 # -----------------
 # Utility helpers
@@ -354,21 +355,15 @@ def save_config(cfg: GAConfig, out_path: str) -> None:
     with open(out_path, "w") as f:
         json.dump(asdict(cfg), f, indent=2)
 
-def run_ga_master(cfg: GAConfig,
-                  random_seed: Optional[int] = None,):
-    if random_seed is not None:
-        random.seed(random_seed)
-        np.random.seed(random_seed)
+def run_ga_master(cfg: GAConfig, EVAL_MAX_WORKERS=None):
+    random.seed(cfg.random_seed)
+    np.random.seed(cfg.random_seed)
     
-    seed_pairs = load_seed_sequence('sequence_XY.txt')
-    N_PULSES = len(seed_pairs)
-    seed_indices = [cfg.allowed_pulses.index(p) for p in seed_pairs]
-
-    best_idx, best_history, history = run_ga_strong(N_PULSES, seed_indices, cfg, EVAL_MAX_WORKERS=None)
+    best_idx, best_history, history = run_ga_strong(cfg, EVAL_MAX_WORKERS)
 
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     file_dir = "sequences/" + ts
-    os.mkdir(file_dir)
+    os.makedirs(file_dir, exist_ok=True)
     save_sequence_with_times(best_idx, cfg, file_dir + "/best_sequence.txt")
     save_config(cfg, file_dir + "/config.json")
     with open(file_dir + "/history.txt", "w") as f:
@@ -387,18 +382,16 @@ def run_ga_master(cfg: GAConfig,
 # Demo / script
 # --------------
 if __name__ == "__main__":
-    random.seed(42)
-    np.random.seed(42)
 
     pop_sizes = np.linspace(20, 400, 20)
     for pop_size in pop_sizes:
-        print("Population size: ", pop_size)
+        print("Population size: ", int(pop_size))
 
         cfg = GAConfig(
             mol_num=1000,
             temps=(25e-6, 25e-6, 25e-6),
             allowed_pulses=((0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (1, -6), (1, -5), (1, -4), (1, -3), (1, -2)),
-            ngen=5,
+            ngen=20,
             mu=int(pop_size), # population size
             lambda_=int(pop_size/2), # number of selected parents after tournament
             cxpb=0.65,
@@ -414,10 +407,11 @@ if __name__ == "__main__":
             p_insert=0.20,
             p_delete=0.20,
             p_modify=0.60,
+            random_seed=42,
         )
 
         
 
-        best_idx, best_history, history = run_ga_master(cfg, EVAL_MAX_WORKERS=None)
+        run_ga_master(cfg, EVAL_MAX_WORKERS=None)
 
     
