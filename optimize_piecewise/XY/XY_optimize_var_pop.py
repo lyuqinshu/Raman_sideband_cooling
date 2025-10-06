@@ -301,6 +301,7 @@ def run_ga_strong(cfg: GAConfig,
         hof.update(pop)
         record = stats.compile(pop)
         logbook.record(gen=gen, nevals=len(invalid), **record)
+        history.append(record['all'])
         best_history.append(record["max"])  # type: ignore
         print("Gen ", gen, ": ", record['all'])
 
@@ -333,7 +334,7 @@ def run_ga_strong(cfg: GAConfig,
     print("Best history: ", best_history)
     print("Done.")
 
-    return best_idx, best_history, history
+    return best_idx, history
 
 # -----------------
 # Utility helpers
@@ -355,11 +356,11 @@ def save_config(cfg: GAConfig, out_path: str) -> None:
     with open(out_path, "w") as f:
         json.dump(asdict(cfg), f, indent=2)
 
-def run_ga_master(cfg: GAConfig, EVAL_MAX_WORKERS=None):
+def run_ga_master(cfg: GAConfig, EVAL_MAX_WORKERS=None, file_dir = "sequences/"):
     random.seed(cfg.random_seed)
     np.random.seed(cfg.random_seed)
     
-    best_idx, best_history, history = run_ga_strong(cfg, EVAL_MAX_WORKERS)
+    best_idx, history = run_ga_strong(cfg, EVAL_MAX_WORKERS)
 
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     file_dir = "sequences/" + ts
@@ -374,10 +375,6 @@ def run_ga_master(cfg: GAConfig, EVAL_MAX_WORKERS=None):
         for p in cfg.allowed_pulses:
             f.write(f"{p}\n")
 
-    print("Best length: ", len(best_idx))
-    print("Best history: ", best_history)
-    print("Done.")
-
 # --------------
 # Demo / script
 # --------------
@@ -391,7 +388,7 @@ if __name__ == "__main__":
             mol_num=1000,
             temps=(25e-6, 25e-6, 25e-6),
             allowed_pulses=((0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (1, -6), (1, -5), (1, -4), (1, -3), (1, -2)),
-            ngen=20,
+            ngen=30,
             mu=int(pop_size), # population size
             lambda_=int(pop_size/2), # number of selected parents after tournament
             cxpb=0.65,
@@ -412,6 +409,6 @@ if __name__ == "__main__":
 
         
 
-        run_ga_master(cfg, EVAL_MAX_WORKERS=None)
+        run_ga_master(cfg, EVAL_MAX_WORKERS=None, file_dir='sequences/scan_pop_size/')
 
     
