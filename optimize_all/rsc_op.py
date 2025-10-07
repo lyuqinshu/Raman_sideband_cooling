@@ -56,7 +56,7 @@ class GAConfig:
 def cost_function(mol_list: Iterable) -> int:
     good = 0
     for mol in mol_list:
-        if mol.n[0] <= 1 and mol.n[1] <= 1 and mol.n[2] <= 120 and mol.state == 1 and mol.spin == 0 and not mol.islost:
+        if mol.n[0] == 0 and mol.n[1] == 0 and mol.n[2] == 0 and mol.state == 1 and mol.spin == 0 and not mol.islost:
             good += 1
     return good
 
@@ -205,9 +205,10 @@ def _evaluate_individuals_via_jobs(individuals: List[List[int]],
 # --------------- GA main loop ----------------
 
 def run_ga_strong(cfg: GAConfig,
-                  EVAL_MAX_WORKERS: Optional[int] = None) -> Tuple[List[int], List[float]]:
+                  seed_pairs,
+                  EVAL_MAX_WORKERS: Optional[int] = None,
+                  ) -> Tuple[List[int], List[float]]:
     
-    seed_pairs = load_seed_sequence('sequence_XY.txt')
     N_PULSES = len(seed_pairs)
     seed_indices = [cfg.allowed_pulses.index(p) for p in seed_pairs]
     toolbox = build_toolbox(N_PULSES, cfg, seed_indices)
@@ -356,11 +357,11 @@ def save_config(cfg: GAConfig, out_path: str) -> None:
     with open(out_path, "w") as f:
         json.dump(asdict(cfg), f, indent=2)
 
-def run_ga_master(cfg: GAConfig, EVAL_MAX_WORKERS=None, file_dir = "sequences/"):
+def run_ga_master(cfg: GAConfig, seed_pairs, EVAL_MAX_WORKERS=None, file_dir = "sequences/"):
     random.seed(cfg.random_seed)
     np.random.seed(cfg.random_seed)
     
-    best_idx, history = run_ga_strong(cfg, EVAL_MAX_WORKERS)
+    best_idx, history = run_ga_strong(cfg, seed_pairs, EVAL_MAX_WORKERS)
 
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     file_dir = file_dir + ts
@@ -380,35 +381,35 @@ def run_ga_master(cfg: GAConfig, EVAL_MAX_WORKERS=None, file_dir = "sequences/")
 # --------------
 if __name__ == "__main__":
 
-    pop_sizes = np.linspace(20, 400, 20)
-    for pop_size in pop_sizes:
-        print("Population size: ", int(pop_size))
+    allowed_pulses=((0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (0, -1), 
+                    (1, -6), (1, -5), (1, -4), (1, -3), (1, -2), (1, -1),
+                    (2, -9), (2, -8), (2, -7), (2, -6), (2, -5), (2, -4), (2, -3), (2, -2), (2, -1))
 
-        cfg = GAConfig(
-            mol_num=1000,
-            temps=(25e-6, 25e-6, 25e-6),
-            allowed_pulses=((0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (1, -6), (1, -5), (1, -4), (1, -3), (1, -2)),
-            ngen=30,
-            mu=int(pop_size), # population size
-            lambda_=int(pop_size/2), # number of selected parents after tournament
-            cxpb=0.65,
-            mutpb=0.35,
-            tournament_k=3, # tournament size
-            len_penalty=0.5,
-            time_penalty=0.0,
-            mutpb_decay=0.985,
-            mut_indpb=0.12,
-            patience=6,
-            min_len=20,
-            max_len=120,
-            p_insert=0.20,
-            p_delete=0.20,
-            p_modify=0.60,
-            random_seed=42,
-        )
+    cfg = GAConfig(
+        mol_num=1000,
+        temps=(25e-6, 25e-6, 25e-6),
+        allowed_pulses=allowed_pulses,
+        ngen=100,
+        mu=int(1000), # population size
+        lambda_=int(1000/4), # number of selected parents after tournament
+        cxpb=0.65,
+        mutpb=0.35,
+        tournament_k=20, # tournament size
+        len_penalty=0.,
+        time_penalty=0.0,
+        mutpb_decay=0.99,
+        mut_indpb=0.12,
+        patience=10,
+        min_len=100,
+        max_len=1000,
+        p_insert=0.10,
+        p_delete=0.20,
+        p_modify=0.60,
+        random_seed=42,
+    )
+    seed_pairs = load_seed_sequence('sequences/original.txt')
+    
 
-        
-
-        run_ga_master(cfg, EVAL_MAX_WORKERS=None, file_dir='sequences/scan_pop_size/')
+    run_ga_master(cfg, seed_pairs, EVAL_MAX_WORKERS=None, file_dir='sequences/')
 
     
