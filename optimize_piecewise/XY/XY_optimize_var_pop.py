@@ -400,7 +400,7 @@ if __name__ == "__main__":
             mut_indpb=0.12,
             patience=6,
             min_len=20,
-            max_len=80,
+            max_len=120,
             p_insert=0.20,
             p_delete=0.20,
             p_modify=0.60,
