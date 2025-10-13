@@ -298,6 +298,13 @@ def run_ga_strong(cfg: GAConfig,
         # (μ + λ) selection with elitism
         pop = tools.selBest(pop + offspring, cfg.mu)
 
+        for ind in pop:
+            if hasattr(ind.fitness, "values"):
+                del ind.fitness.values
+        fits = _evaluate_individuals_via_jobs(pop, cfg, max_workers=EVAL_MAX_WORKERS)
+        for ind, fit in zip(pop, fits):
+            ind.fitness.values = (fit,)
+
         # HOF / stats
         hof.update(pop)
         record = stats.compile(pop)
@@ -395,7 +402,7 @@ if __name__ == "__main__":
         cxpb=0.65,
         mutpb=0.35,
         tournament_k=20, # tournament size
-        len_penalty=0.,
+        len_penalty=0.1,
         time_penalty=0.0,
         mutpb_decay=0.99,
         mut_indpb=0.12,
