@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH -J all_op_run1
 #SBATCH -p sapphire
-#SBATCH -c 36
-#SBATCH -t 0-24:00:00 
-#SBATCH --mem=8G
+#SBATCH -c 72
+#SBATCH -t 3-00:00:00 
+#SBATCH --mem=16G
 #SBATCH -o py_%j.o 
 #SBATCH -e py_%j.e 
 
