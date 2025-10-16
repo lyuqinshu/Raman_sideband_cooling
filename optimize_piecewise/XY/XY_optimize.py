@@ -181,7 +181,7 @@ def _evaluate_individuals_via_jobs(individuals: List[List[int]],
             for mol in mols:
                 futures.append(ex.submit(_eval_job, ind_idx, mol, seq, optical_pumping))
 
-        with tqdm(total=total_jobs, desc="Evaluating jobs", unit="mol") as pbar:
+        with tqdm(total=total_jobs, desc="Evaluating jobs", unit="mol", mininterval=10) as pbar:
             for fut in as_completed(futures):
                 ind_idx, updated_mol = fut.result()
                 per_ind_mols[ind_idx].append(updated_mol)
