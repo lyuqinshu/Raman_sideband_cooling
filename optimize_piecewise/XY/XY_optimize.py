@@ -47,6 +47,7 @@ class GAConfig:
     p_insert: float = 0.20
     p_delete: float = 0.20
     p_modify: float = 0.60
+    random_seed: int = 42
 
 # -----------------------------
 # Helpers
@@ -203,10 +204,12 @@ def _evaluate_individuals_via_jobs(individuals: List[List[int]],
 
 # --------------- GA main loop ----------------
 
-def run_ga_strong(N_PULSES: int,
-                  seed_indices: List[int],
-                  cfg: GAConfig,
-                  EVAL_MAX_WORKERS: Optional[int] = None) -> Tuple[List[int], List[float]]:
+def run_ga_strong(cfg: GAConfig,
+                  seed_pairs,
+                  EVAL_MAX_WORKERS: Optional[int] = None,
+                  ) -> Tuple[List[int], List[float]]:
+    N_PULSES = len(seed_pairs)
+    seed_indices = [cfg.allowed_pulses.index(p) for p in seed_pairs]
     toolbox = build_toolbox(N_PULSES, cfg, seed_indices)
     pop = toolbox.population(n=cfg.mu)
 
@@ -294,6 +297,13 @@ def run_ga_strong(N_PULSES: int,
         # (μ + λ) selection with elitism
         pop = tools.selBest(pop + offspring, cfg.mu)
 
+        for ind in pop:
+            if hasattr(ind.fitness, "values"):
+                del ind.fitness.values
+        fits = _evaluate_individuals_via_jobs(pop, cfg, max_workers=EVAL_MAX_WORKERS)
+        for ind, fit in zip(pop, fits):
+            ind.fitness.values = (fit,)
+
         # HOF / stats
         hof.update(pop)
         record = stats.compile(pop)
@@ -311,7 +321,25 @@ def run_ga_strong(N_PULSES: int,
             if gens_without_improve >= cfg.patience:
                 break
 
-    best_ind = list(hof[0])
+    best_idx = list(hof[0])
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    file_dir = "sequences/" + ts
+    os.mkdir(file_dir)
+    save_sequence_with_times(best_idx, cfg, file_dir + "/best_sequence.txt")
+    save_config(cfg, file_dir + "/config.json")
+    with open(file_dir + "/history.txt", "w") as f:
+        for val in history:
+            f.write(f"{val}\n")
+
+    with open(file_dir + "/allowed_pulses.txt", "w") as f:
+        for p in cfg.allowed_pulses:
+            f.write(f"{p}\n")
+
+    print("Best length: ", len(best_idx))
+    print("Best history: ", best_history)
+    print("Done.")
+
+    return best_idx, history
     return best_ind, best_history, history
 
 # -----------------
@@ -334,21 +362,17 @@ def save_config(cfg: GAConfig, out_path: str) -> None:
     with open(out_path, "w") as f:
         json.dump(asdict(cfg), f, indent=2)
 
-def run_ga_master(cfg: GAConfig,
-                  random_seed: Optional[int] = None,):
-    if random_seed is not None:
-        random.seed(random_seed)
-        np.random.seed(random_seed)
+def run_ga_master(cfg: GAConfig, seed_pairs, 
+                  EVAL_MAX_WORKERS=None, 
+                  file_dir = "sequences/"):
+    random.seed(cfg.random_seed)
+    np.random.seed(cfg.random_seed)
     
-    seed_pairs = load_seed_sequence('sequence_XY.txt')
-    N_PULSES = len(seed_pairs)
-    seed_indices = [cfg.allowed_pulses.index(p) for p in seed_pairs]
-
-    best_idx, best_history, history = run_ga_strong(N_PULSES, seed_indices, cfg, EVAL_MAX_WORKERS=None)
+    best_idx, history = run_ga_strong(cfg, seed_pairs, EVAL_MAX_WORKERS)
 
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    file_dir = "sequences/" + ts
-    os.mkdir(file_dir)
+    file_dir = file_dir + ts
+    os.makedirs(file_dir, exist_ok=True)
     save_sequence_with_times(best_idx, cfg, file_dir + "/best_sequence.txt")
     save_config(cfg, file_dir + "/config.json")
     with open(file_dir + "/history.txt", "w") as f:
@@ -358,10 +382,6 @@ def run_ga_master(cfg: GAConfig,
     with open(file_dir + "/allowed_pulses.txt", "w") as f:
         for p in cfg.allowed_pulses:
             f.write(f"{p}\n")
-
-    print("Best length: ", len(best_idx))
-    print("Best history: ", best_history)
-    print("Done.")
 
 # --------------
 # Demo / script
@@ -376,12 +396,12 @@ if __name__ == "__main__":
         mol_num=1000,
         temps=(25e-6, 25e-6, 25e-6),
         allowed_pulses=((0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (1, -6), (1, -5), (1, -4), (1, -3), (1, -2)),
-        ngen=20,
-        mu=150, # population size
-        lambda_=75, # number of selected parents after tournament
+        ngen=100,
+        mu=1000, # population size
+        lambda_=250, # number of selected parents after tournament
         cxpb=0.65,
         mutpb=0.35,
-        tournament_k=3, # tournament size
+        tournament_k=20, # tournament size
         len_penalty=0.5,
         time_penalty=0.0,
         mutpb_decay=0.985,
@@ -392,27 +412,9 @@ if __name__ == "__main__":
         p_insert=0.20,
         p_delete=0.20,
         p_modify=0.60,
+        random_seed=42,
     )
 
     seed_pairs = load_seed_sequence('sequence_XY.txt')
-    N_PULSES = len(seed_pairs)
-    seed_indices = [cfg.allowed_pulses.index(p) for p in seed_pairs]
 
-    best_idx, best_history, history = run_ga_strong(N_PULSES, seed_indices, cfg, EVAL_MAX_WORKERS=None)
-
-    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    file_dir = "sequences/" + ts
-    os.mkdir(file_dir)
-    save_sequence_with_times(best_idx, cfg, file_dir + "/best_sequence.txt")
-    save_config(cfg, file_dir + "/config.json")
-    with open(file_dir + "/history.txt", "w") as f:
-        for val in history:
-            f.write(f"{val}\n")
-
-    with open(file_dir + "/allowed_pulses.txt", "w") as f:
-        for p in cfg.allowed_pulses:
-            f.write(f"{p}\n")
-
-    print("Best length: ", len(best_idx))
-    print("Best history: ", best_history)
-    print("Done.")
+    run_ga_master(cfg, seed_pairs, EVAL_MAX_WORKERS=None, file_dir = "sequences/")
