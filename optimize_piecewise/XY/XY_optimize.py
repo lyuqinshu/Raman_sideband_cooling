@@ -27,7 +27,7 @@ import scipy.stats
 class GAConfig:
     mol_num: int = 1000
     temps: Tuple[float, float, float] = (25e-6, 25e-6, 25e-6)
-    allowed_pulses: Tuple[Tuple[int, int]] = ((0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (1, -6), (1, -5), (1, -4), (1, -3), (1, -2))
+    allowed_pulses: Tuple[Tuple[int, int], ...] = ((0, -6), (0, -5), (0, -4), (0, -3), (0, -2), (1, -6), (1, -5), (1, -4), (1, -3), (1, -2))
     ngen: int = 10
     mu: int = 40         
     lambda_: int = 20    
@@ -322,25 +322,12 @@ def run_ga_strong(cfg: GAConfig,
                 break
 
     best_idx = list(hof[0])
-    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    file_dir = "sequences/" + ts
-    os.mkdir(file_dir)
-    save_sequence_with_times(best_idx, cfg, file_dir + "/best_sequence.txt")
-    save_config(cfg, file_dir + "/config.json")
-    with open(file_dir + "/history.txt", "w") as f:
-        for val in history:
-            f.write(f"{val}\n")
-
-    with open(file_dir + "/allowed_pulses.txt", "w") as f:
-        for p in cfg.allowed_pulses:
-            f.write(f"{p}\n")
 
     print("Best length: ", len(best_idx))
     print("Best history: ", best_history)
     print("Done.")
 
     return best_idx, history
-    return best_ind, best_history, history
 
 # -----------------
 # Utility helpers
