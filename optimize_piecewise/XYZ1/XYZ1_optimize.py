@@ -63,6 +63,15 @@ def cost_function(mol_list: Iterable) -> int:
 def sequence_from_indices(indices: List[int], cfg: GAConfig) -> List[Tuple[int, int, float]]:
     pulses = [cfg.allowed_pulses[i] for i in indices]
     return [[axis, dn, RSC_sim.pulse_time(axis, dn)] for axis, dn in pulses]
+    
+import ast
+
+def load_seed_sequence(filepath: str) -> List[Tuple[int, int]]:
+    with open(filepath, "r") as f:
+        lines = [line.strip() for line in f if line.strip()]
+    # safer than eval
+    seq = [tuple(ast.literal_eval(line)) for line in lines]
+    return [(int(a), int(dn)) for (a, dn) in seq]
 
 
 # ------------- job worker (single molecule) -------------
@@ -148,6 +157,8 @@ def _mut_varlen_factory(cfg: GAConfig):
 # --------- Core: evaluate a batch of individuals via 1000-per-ind jobs ---------
 
 from tqdm import tqdm
+def _pairs_to_timed_sequence(pairs: List[Tuple[int, int]]) -> List[Tuple[int, int, float]]:
+    return [(axis, dn, RSC_sim.pulse_time(axis, dn)) for axis, dn in pairs]
 
 def _evaluate_individuals_via_jobs(individuals: List[List[int]],
                                    cfg: GAConfig,
@@ -159,14 +170,14 @@ def _evaluate_individuals_via_jobs(individuals: List[List[int]],
     aggregates per-individual molecules, and returns fitness list aligned to 'individuals'.
     Shows a progress bar for completed jobs.
     """
-    pre_sequence = load_seed_sequence('XY_optimized.txt')
-    individuals = pre_sequence + individuals
+    prefix_pairs = load_seed_sequence('XY_optimized.txt')  # if you actually want a fixed prefix
+    prefix_seq = _pairs_to_timed_sequence(prefix_pairs)
 
     if max_workers is None:
         max_workers = os.cpu_count() or 4
 
     # Pre-compute pulse sequences for all individuals
-    seqs = [sequence_from_indices(ind, cfg) for ind in individuals]
+    seqs = [prefix_seq + sequence_from_indices(ind, cfg) for ind in individuals]
 
     # Prepare per-individual molecule storage
     from collections import defaultdict
@@ -384,12 +395,12 @@ if __name__ == "__main__":
         mol_num=1000,
         temps=(25e-6, 25e-6, 25e-6),
         allowed_pulses=((0, -2), (0, -1), (1, -2), (1, -1), (2, -9), (2, -8), (2, -7), (2, -6), (2, -5), (2, -4)),
-        ngen=100,
-        mu=1000, # population size
-        lambda_=250, # number of selected parents after tournament
+        ngen=2,
+        mu=10, # population size
+        lambda_=5, # number of selected parents after tournament
         cxpb=0.65,
         mutpb=0.35,
-        tournament_k=20, # tournament size
+        tournament_k=3, # tournament size
         len_penalty=0.5,
         time_penalty=0.0,
         mutpb_decay=0.985,
