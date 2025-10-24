@@ -48,6 +48,7 @@ class GAConfig:
     p_delete: float = 0.20
     p_modify: float = 0.60
     random_seed: int = 42
+    top_n_hof: int = 5
 
 # -----------------------------
 # Helpers
@@ -239,7 +240,7 @@ def run_ga_strong(cfg: GAConfig,
     if len(pop) > 0:
         pop[0][:] = list(seed)
 
-    hof = tools.HallOfFame(1)
+    hof = tools.HallOfFame(cfg.top_n_hof)
     stats = tools.Statistics(lambda ind: ind.fitness.values[0])
     stats.register("max", np.max)
     stats.register("std", scipy.stats.sem)
@@ -339,7 +340,7 @@ def run_ga_strong(cfg: GAConfig,
     print("Best history: ", best_history)
     print("Done.")
 
-    return best_idx, history
+    return hof, history
 
 # -----------------
 # Utility helpers
@@ -367,20 +368,30 @@ def run_ga_master(cfg: GAConfig, seed_pairs,
     random.seed(cfg.random_seed)
     np.random.seed(cfg.random_seed)
     
-    best_idx, history = run_ga_strong(cfg, seed_pairs, EVAL_MAX_WORKERS)
+    hof, history = run_ga_strong(cfg, seed_pairs, EVAL_MAX_WORKERS)
 
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     file_dir = file_dir + ts
     os.makedirs(file_dir, exist_ok=True)
-    save_sequence_with_times(best_idx, cfg, file_dir + "/best_sequence.txt")
-    save_config(cfg, file_dir + "/config.json")
-    with open(file_dir + "/history.txt", "w") as f:
-        for val in history:
-            f.write(f"{val}\n")
+    # Save all top-N best sequences
+    for i, ind in enumerate(hof):
+        seq_idx = list(ind)
+        out_path = f"{file_dir}/best_{i}.txt"
+        save_sequence_with_times(seq_idx, cfg, out_path)
+        print(f"Saved top-{i} sequence to {out_path}")
 
-    with open(file_dir + "/allowed_pulses.txt", "w") as f:
-        for p in cfg.allowed_pulses:
-            f.write(f"{p}\n")
+        # Also save best (top-0) for backward compatibility
+        save_sequence_with_times(list(hof[0]), cfg, f"{file_dir}/best_sequence.txt")
+
+        # Save run metadata
+        save_config(cfg, f"{file_dir}/config.json")
+        with open(f"{file_dir}/history.txt", "w") as f:
+            for val in history:
+                f.write(f"{val}\n")
+        with open(f"{file_dir}/allowed_pulses.txt", "w") as f:
+            for p in cfg.allowed_pulses:
+                f.write(f"{p}\n")
+
 
 # --------------
 # Demo / script
@@ -392,16 +403,16 @@ if __name__ == "__main__":
     
 
     cfg = GAConfig(
-        mol_num=1000,
+        mol_num=10000,
         temps=(25e-6, 25e-6, 25e-6),
         allowed_pulses=((0, -3), (0, -2), (0, -1), (1, -3), (1, -2), (1, -1), (2, -9), (2, -8), (2, -7), (2, -6), (2, -5), (2, -4)),
-        ngen=40,
-        mu=1000, # population size
-        lambda_=250, # number of selected parents after tournament
+        ngen=20,
+        mu=100, # population size
+        lambda_=40, # number of selected parents after tournament
         cxpb=0.65,
         mutpb=0.35,
-        tournament_k=20, # tournament size
-        len_penalty=0.5,
+        tournament_k=10, # tournament size
+        len_penalty=100,
         time_penalty=0.0,
         mutpb_decay=0.985,
         mut_indpb=0.12,
@@ -412,6 +423,7 @@ if __name__ == "__main__":
         p_delete=0.30,
         p_modify=0.60,
         random_seed=42,
+        top_n_hof = 5
     )
 
     seed_pairs = load_seed_sequence('sequence_XYZ1.txt')
